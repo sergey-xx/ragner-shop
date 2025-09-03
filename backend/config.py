@@ -1,0 +1,100 @@
+import logging
+from enum import Enum
+
+from django.conf import settings
+from liveconfigs.models import BaseConfig
+
+from .validators import validate_telegram_html
+
+logger = logging.getLogger()
+
+DESCRIPTION_SUFFIX = "_DESCRIPTION"
+TAGS_SUFFIX = "_TAGS"
+VALIDATORS_SUFFIX = "_VALIDATORS"
+
+
+class ConfigTags(str, Enum):
+    urls = "links"
+    payment = "payments"
+    basic = "basic"
+    other = "other"
+    text = "text"
+
+
+class URL_CONFIG(BaseConfig):
+    __topic__ = 'Links configuration'
+
+    __exported__ = [
+        'DAYS',
+        'FIRST_DAY_OF_WEEK',
+        'TYPES_OF_LOADING',
+        'USE_CALENDAR',
+        'CONSOLIDATION_GROUPS',
+    ]
+
+    SITE_LINK: str = 'https://www.python.org/'
+    SITE_LINK_DESCRIPTION = "Настройка ссылки на сайт"
+    SITE_LINK_TAGS = [ConfigTags.urls]
+
+    BOT_URL = settings.ENV.str('BOT_URL')
+    BOT_URL_DESCRIPTION = "LINK to this bot"
+    BOT_URL_LINK_TAGS = [ConfigTags.urls]
+
+    ADMIN_ID: int = settings.ENV.int('ADMIN_ID')
+    ADMIN_ID_DESCRIPTION = "ADMIN_ID for notifications"
+    ADMIN_ID_LINK_TAGS = [ConfigTags.urls]
+
+    ADMIN_USERNAME: str = settings.ENV.str('ADMIN_USERNAME', '')
+    ADMIN_USERNAME_DESCRIPTION = "ADMIN_USERNAME for notifications"
+    ADMIN_USERNAME_LINK_TAGS = [ConfigTags.urls]
+
+
+class TEXT_CONFIG(BaseConfig):
+    __topic__ = 'Text configurations'
+
+    HI_MSG: str = 'Welcome To RAGNER GIFTCARD BOT'
+    HI_MSG_DESCRIPTION = "Welcome message"
+    HI_MSG_TAGS = [ConfigTags.text]
+
+    MENU_MSG: str = 'Menu'
+    MENU_MSG_DESCRIPTION = "Welcome message"
+    MENU_MSG_TAGS = [ConfigTags.text]
+
+    WRONG_PUBGID_MSG: str = 'Not valid ID format'
+    WRONG_PUBGID_MSG_DESCRIPTION = "Not valid ID format"
+    WRONG_PUBGID_MSG_TAGS = [ConfigTags.text]
+
+
+class BUTT_CONFIG(BaseConfig):
+    __topic__ = 'Button text configuration'
+
+    BACK: str = 'Back'
+    BACK_DESCRIPTION = "Back button text"
+    BACK_TAGS = [ConfigTags.text]
+
+    TOPUP: str = 'TOPUP'
+    TOPUP_DESCRIPTION = "TOPUP button text"
+    TOPUP_TAGS = [ConfigTags.text]
+
+
+class PAYMENT_CONFIG(BaseConfig):
+    __topic__ = 'Payment configuration'
+
+    TOPUP_COMISSION: float = 1.000
+    TOPUP_COMISSION_DESCRIPTION = "Min topup comission (max 3 digits after point)"
+    TOPUP_COMISSION_TAGS = [ConfigTags.payment]
+
+    TOPUP_LIFETIME: int = 24
+    TOPUP_LIFETIME_DESCRIPTION = "Topup lifetime in hours"
+    TOPUP_LIFETIME_TAGS = [ConfigTags.payment]
+
+    PAYMENT_TEXT: str = (
+        'Bybit\n\n'
+        'UID: <code>000000000</code>\n'
+        'TRC20: <code>TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT</code>\n'
+        'BEP20: <code>0x000000000000000000000000000000</code>\n'
+        'APTOS: <code>0x111111111111111111111111111111</code>\n'
+    )
+    PAYMENT_TEXT_DESCRIPTION = "Text with payment credentials"
+    PAYMENT_TEXT_TAGS = [ConfigTags.payment]
+    PAYMENT_TEXT_VALIDATORS = [validate_telegram_html]

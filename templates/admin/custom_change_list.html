@@ -1,0 +1,13 @@
+{% extends "admin/change_list.html" %}
+
+{% block content %}
+  {{ block.super }}
+  <div class="total-summary">
+    <div class="card-body">
+      <form method="post" enctype="multipart/form-data" action="{{ revese_url }}">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">Import</button>
+    </form>
+  </div>
+{% endblock %}

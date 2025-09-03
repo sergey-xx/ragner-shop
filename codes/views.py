@@ -1,0 +1,63 @@
+import logging
+
+from django.contrib.admin.views.decorators import staff_member_required
+from django.http import HttpResponse
+from django.shortcuts import render
+from .forms import ImportForm, GiftCardImportForm, StockbleCodeImportForm
+from codes.models import UcCode, Giftcard, StockbleCode
+from django.shortcuts import redirect
+from django.urls import reverse
+
+MIN_PERCENT = 80
+
+logger = logging.getLogger(name=__name__)
+
+
+@staff_member_required
+def import_codes_view(request):
+    if request.method == 'POST':
+        form = ImportForm(request.POST, request.FILES)
+        if form.is_valid():
+            codes = form.cleaned_data['codes']
+            amount = form.cleaned_data['amount']
+            activator = form.cleaned_data['activator']
+            db_codes = [UcCode(amount=amount, code=code, activator=activator) for code in codes]
+            UcCode.objects.bulk_create(db_codes, batch_size=1000,)
+            return redirect(reverse('admin:codes_uccode_changelist'))
+        else:
+            return HttpResponse(f"There error in form:\n {form.errors}")
+    else:
+        form = ImportForm()
+    return render(request, 'admin/import_codes.html', {'form': form})
+
+
+@staff_member_required
+def import_giftcards_view(request):
+    if request.method == 'POST':
+        form = GiftCardImportForm(request.POST)
+        if form.is_valid():
+            db_codes = [Giftcard(item=form.cleaned_data['item'], code=code) for code in form.cleaned_data['codes']]
+            Giftcard.objects.bulk_create(db_codes, batch_size=1000,)
+            return redirect(reverse('admin:codes_giftcard_changelist'))
+        else:
+            return HttpResponse(f"There error in form:\n {form.errors}")
+    else:
+        form = ImportForm()
+    return render(request, 'admin/import_codes.html', {'form': form})
+
+
+@staff_member_required
+def import_stockblecode_view(request):
+    if request.method == 'POST':
+        form = StockbleCodeImportForm(request.POST)
+        if form.is_valid():
+            db_codes = [
+                StockbleCode(amount=form.cleaned_data['amount'], code=code) for code in form.cleaned_data['codes']
+            ]
+            StockbleCode.objects.bulk_create(db_codes, batch_size=1000,)
+            return redirect(reverse('admin:codes_stockblecode_changelist'))
+        else:
+            return HttpResponse(f"There error in form:\n {form.errors}")
+    else:
+        form = ImportForm()
+    return render(request, 'admin/import_codes.html', {'form': form})
