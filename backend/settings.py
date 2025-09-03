@@ -2,22 +2,14 @@ from pathlib import Path
 
 from environ import Env
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-ENV = Env(
-    DEBUG=(bool, False)
-)
-ENV.read_env(Path(BASE_DIR, '.env'))
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
+ENV = Env()
 
-# SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = ENV.str('SECRET_KEY')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = ENV.bool('DEBUG')
+DEBUG = ENV.bool('DEBUG', default=False)
 
 ALLOWED_HOSTS = ENV.list('ALLOWED_HOSTS', default=['127.0.0.1', 'localhost'])
 
@@ -71,8 +63,6 @@ TEMPLATES = [
 WSGI_APPLICATION = 'backend.wsgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
 
 DATABASES = {
@@ -81,14 +71,12 @@ DATABASES = {
         'NAME': ENV.str('POSTGRES_DB'),
         'USER': ENV.str('POSTGRES_USER'),
         'PASSWORD': ENV.str('POSTGRES_PASSWORD'),
-        'HOST': ENV.str('DB_HOST'),
-        'PORT': ENV.str('DB_PORT'),
+        'HOST': ENV.str('POSTGRES_HOST'),
+        'PORT': ENV.str('POSTGRES_PORT'),
     }
 }
 
 
-# Password validation
-# https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -106,8 +94,6 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-# Internationalization
-# https://docs.djangoproject.com/en/5.0/topics/i18n/
 
 LANGUAGE_CODE = 'en-us'
 
@@ -118,8 +104,6 @@ USE_I18N = True
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.0/howto/static-files/
 
 STATIC_URL = '/static/'
 MEDIA_URL = '/media/'
@@ -130,8 +114,6 @@ MEDIA_ROOT = BASE_DIR / 'media/'
 LOGS_PATH = BASE_DIR / 'logs'
 
 
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
