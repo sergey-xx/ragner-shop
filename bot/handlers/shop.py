@@ -15,6 +15,7 @@ from items.models import (
     GiftcardItem,
     HomeVoteItem,
     Item,
+    ManualCategory,
     OffersItem,
     PopularityItem,
     PUBGUCItem,
@@ -76,11 +77,16 @@ async def get_folder_items(
     folder = await Folder.objects.aget(id=callback_data.id)
     items = await folder.aitems()
     text = await get_shop_text("Choose item")
+
+    back_callback = MenuCD(category="root")
+    if callback_data.category == Item.Category.MORE_PUBG:
+        back_callback = MenuCD(category=MenuCD.Category.pop_home)
+    elif callback_data.category in [Item.Category.CODES, Item.Category.GIFTCARD]:
+        back_callback = MenuCD(category=MenuCD.Category.stock_codes)
+
     await query.message.edit_text(
         text=text,
-        reply_markup=await kb.get_items_inline(
-            items, callback_data=MenuCD(category=callback_data.category)
-        ),
+        reply_markup=await kb.get_items_inline(items, callback_data=back_callback),
     )
 
 
@@ -89,7 +95,7 @@ async def get_pop_home_root(
     query: CallbackQuery, callback_data: MenuCD, state: FSMContext
 ):
     await query.message.edit_text(
-        text="Choose category", reply_markup=await kb.get_pop_home_inline()
+        text="Choose category", reply_markup=await kb.get_more_pubg_services_inline()
     )
 
 
@@ -97,7 +103,7 @@ async def get_pop_home_root(
 async def get_popularity_items(
     query: CallbackQuery, callback_data: MenuCD, state: FSMContext
 ):
-    items = await PopularityItem.aitems()
+    items = await PopularityItem.aitems(folder__isnull=True)
     text = await get_shop_text("Choose item")
     await query.message.edit_text(
         text=text,
@@ -111,7 +117,7 @@ async def get_popularity_items(
 async def get_home_vote_items(
     query: CallbackQuery, callback_data: MenuCD, state: FSMContext
 ):
-    items = await HomeVoteItem.aitems()
+    items = await HomeVoteItem.aitems(folder__isnull=True)
     text = await get_shop_text("Choose item")
     await query.message.edit_text(
         text=text,
@@ -127,6 +133,20 @@ async def get_offer_items(
     query: CallbackQuery, callback_data: MenuCD, state: FSMContext
 ):
     items = await OffersItem.aitems()
+    text = await get_shop_text("Choose item")
+    await query.message.edit_text(
+        text=text, reply_markup=await kb.get_items_inline(items)
+    )
+
+
+@router.callback_query(MenuCD.filter(F.category.startswith("manual_")))
+async def get_manual_category_items(
+    query: CallbackQuery, callback_data: MenuCD, state: FSMContext
+):
+    category_id = int(callback_data.category.split("_")[1])
+    items = await sync_to_async(list)(
+        Item.objects.filter(manual_category_id=category_id, is_active=True)
+    )
     text = await get_shop_text("Choose item")
     await query.message.edit_text(
         text=text, reply_markup=await kb.get_items_inline(items)
@@ -158,13 +178,22 @@ async def get_DiamondItem_items(
 @router.callback_query(ItemCD.filter(F.action == ItemCD.Action.view))
 async def get_item(query: CallbackQuery, callback_data: ItemCD, state: FSMContext):
     await state.clear()
-    item = await Item.objects.aget(id=callback_data.id)
+    item = await Item.objects.select_related("manual_category").aget(
+        id=callback_data.id
+    )
     quantity = await item.aget_stock_amount()
     if quantity is not None and quantity < 1:
         await query.answer("Not available at the moment")
         return
     await state.update_data(callback_data.model_dump())
-    if item.category in (
+
+    if item.manual_category:
+        await state.set_state(OrderState.pubg_id)
+        prompt_text = item.manual_category.prompt_text
+        await query.message.edit_text(
+            f'"{prompt_text}" for {item.value}', reply_markup=None
+        )
+    elif item.category in (
         Item.Category.PUBG_UC,
         Item.Category.POPULARITY,
         Item.Category.HOME_VOTE,
@@ -203,15 +232,23 @@ async def pay_item_by_keyboard(
 
 @router.message(OrderState.pubg_id)
 async def get_pubg_id(message: Message, state: FSMContext):
-    if len(message.text) < PUBG_ID_LEN or not message.text.isdigit():
-        text = await sync_to_async(lambda: TEXT_CONFIG.WRONG_PUBGID_MSG)()
-        await message.answer(text)
-        return
+    data = await state.get_data()
+    item_id  = data["id"]
+    item = await Item.objects.select_related('manual_category').aget(id=item_id)
+
+    if not item.manual_category and item.category in (
+        Item.Category.PUBG_UC,
+        Item.Category.POPULARITY,
+        Item.Category.HOME_VOTE,
+        Item.Category.OFFERS,
+    ):
+        if len(message.text) < PUBG_ID_LEN or not message.text.isdigit():
+            text = await sync_to_async(lambda: TEXT_CONFIG.WRONG_PUBGID_MSG)()
+            await message.answer(text)
+            return
+
     await state.update_data(pubg_id=message.text)
     await state.set_state(None)
-    data = await state.get_data()
-    id = data["id"]
-    item = await Item.objects.aget(id=id)
     text = f"{item.value} for total {item.get_total_price(1)} USD"
     await create_order(state, item, message=message)
     await state.set_state(None)

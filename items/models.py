@@ -1,53 +1,102 @@
+from asgiref.sync import sync_to_async
 from django.db import models
 
-from asgiref.sync import sync_to_async
-
-from codes.models import StockbleCode, UcCode, Activator
 from admin_panel.models import ManagerChat
-from backend.constants import DEFAULT_UC_AMOUNTS, CODES_MAP
+from backend.constants import CODES_MAP, DEFAULT_UC_AMOUNTS
+from codes.models import Activator, StockbleCode, UcCode
+
+
+class ManualCategory(models.Model):
+    name = models.CharField(max_length=50, verbose_name="Button Name")
+    prompt_text = models.CharField(
+        max_length=255,
+        verbose_name="Player ID Prompt",
+        help_text='e.g., "Input your PUBG ID" or "Enter your Riot ID (Name#Tag)"',
+    )
+    is_active = models.BooleanField(default=True, verbose_name="Is Active?")
+    ordering = models.PositiveSmallIntegerField(default=100, verbose_name="Ordering")
+
+    class Meta:
+        verbose_name = "Manual Order Category"
+        verbose_name_plural = "Manual Order Categories"
+        ordering = ["ordering"]
+
+    def __str__(self):
+        return self.name
 
 
 class Item(models.Model):
-
     class Category(models.TextChoices):
-        PUBG_UC = 'pubg_uc', 'PUBG UC'
-        CODES = 'codes', 'GIFTCARDS & CODES'
-        POPULARITY = 'popularity', 'Popularity'
-        HOME_VOTE = 'home_vote', 'HOME VOTE'
-        OFFERS = 'offers', 'Offers'
-        GIFTCARD = 'giftcard', 'Giftcard'
-        STARS = 'stars', 'Telegram Stars'
-        DIAMOND = 'diamond', 'Mobilelegends diamond'
+        PUBG_UC = "pubg_uc", "PUBG UC"
+        CODES = "codes", "GIFTCARDS & CODES"
+        POPULARITY = "popularity", "Popularity"
+        HOME_VOTE = "home_vote", "HOME VOTE"
+        OFFERS = "offers", "Offers"
+        GIFTCARD = "giftcard", "Giftcard"
+        STARS = "stars", "Telegram Stars"
+        DIAMOND = "diamond", "Mobilelegends diamond"
+        MORE_PUBG = "more_pubg", "More PUBG Services"
 
     title = models.CharField(
-        blank=True, null=True, verbose_name='Title',
-        help_text='Not obligatory. Has priority in the display in the menu'
+        blank=True,
+        null=True,
+        verbose_name="Title",
+        help_text="Not obligatory. Has priority in the display in the menu",
     )
-    category = models.CharField(blank=True, max_length=50, choices=Category, verbose_name='Category')
-    price = models.DecimalField(max_digits=10, decimal_places=3, verbose_name='Price')
+    category = models.CharField(
+        blank=True, max_length=50, choices=Category, verbose_name="Category"
+    )
+    price = models.DecimalField(max_digits=10, decimal_places=3, verbose_name="Price")
     amount = models.IntegerField(
-        blank=True, null=True, choices=DEFAULT_UC_AMOUNTS, verbose_name='Amount', help_text='For codes and popularity'
+        blank=True,
+        null=True,
+        choices=DEFAULT_UC_AMOUNTS,
+        verbose_name="Amount",
+        help_text="For codes and popularity",
     )
-    is_active = models.BooleanField(default=False, verbose_name='Active?')
+    is_active = models.BooleanField(default=False, verbose_name="Active?")
     activator = models.CharField(
-        blank=True, null=True, choices=Activator,
-        verbose_name='Activator', help_text='if not selected, then manual activation'
+        blank=True,
+        null=True,
+        choices=Activator,
+        verbose_name="Activator",
+        help_text="if not selected, then manual activation",
     )
-    data = models.JSONField(blank=True, null=True, verbose_name='Additional data')
+    data = models.JSONField(blank=True, null=True, verbose_name="Additional data")
     chat = models.ForeignKey(
-        ManagerChat, blank=True, null=True, on_delete=models.SET_NULL,
-        related_name='items', verbose_name='Chat for notifications',
+        ManagerChat,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="items",
+        verbose_name="Chat for notifications",
+    )
+    manual_category = models.ForeignKey(
+        "ManualCategory",
+        on_delete=models.CASCADE,
+        related_name="items",
+        verbose_name="Manual Category",
+        blank=True,
+        null=True,
+        help_text="Select only for manual order items",
     )
     folder = models.ForeignKey(
-        'Folder', blank=True, null=True, on_delete=models.SET_NULL,
-        related_name='items', verbose_name='Folder'
+        "Folder",
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="items",
+        verbose_name="Folder",
     )
 
     class Meta:
-        ordering = ["price", "title",]
+        ordering = [
+            "price",
+            "title",
+        ]
 
     def __str__(self) -> str:
-        return f'{self.value} | {self.price}$'
+        return f"{self.value} | {self.price}$"
 
     @classmethod
     def items(cls, **kwargs):
@@ -68,22 +117,22 @@ class Item(models.Model):
     @property
     def value(self):
         if self.category == Item.Category.PUBG_UC:
-            return (self.title or f'{self.amount} UC')
+            return self.title or f"{self.amount} UC"
         if self.category == Item.Category.CODES:
-            return (self.title or f'{self.amount} UC')
+            return self.title or f"{self.amount} UC"
         if self.category == Item.Category.POPULARITY:
-            return (self.title or f'{self.amount} Popularity')
-        return f'{self.title}'
+            return self.title or f"{self.amount} Popularity"
+        return f"{self.title}"
 
     def to_dict(self):
         return {
-            'title': self.title,
-            'value': self.value,
-            'category': self.category,
-            'price': str(self.price),
-            'amount': self.amount,
-            'is_active': self.is_active,
-            'activator': self.activator,
+            "title": self.title,
+            "value": self.value,
+            "category": self.category,
+            "price": str(self.price),
+            "amount": self.amount,
+            "is_active": self.is_active,
+            "activator": self.activator,
         }
 
     def get_total_price(self, quantity: int):
@@ -91,7 +140,9 @@ class Item(models.Model):
 
     def get_stock_amount(self):
         if self.category == Item.Category.CODES:
-            return StockbleCode.objects.filter(amount=self.amount, order__isnull=True).count()
+            return StockbleCode.objects.filter(
+                amount=self.amount, order__isnull=True
+            ).count()
         if self.category == Item.Category.GIFTCARD:
             return self.giftcard_codes.filter(order__isnull=True).count()
         if self.category == Item.Category.PUBG_UC:
@@ -99,10 +150,12 @@ class Item(models.Model):
             counter = [
                 int(
                     UcCode.objects.filter(
-                        models.Q(activator=self.activator) | models.Q(activator__isnull=True),
+                        models.Q(activator=self.activator)
+                        | models.Q(activator__isnull=True),
                         order__isnull=True,
                         amount=nom,
-                    ).count() / nominals.count(nom)
+                    ).count()
+                    / nominals.count(nom)
                 )
                 for nom in nominals
             ]
@@ -114,43 +167,46 @@ class Item(models.Model):
 
 
 class PUBGUCItem(Item):
-
     class Meta:
         proxy = True
         verbose_name = "PUBG UC"
         verbose_name_plural = "PUBG UC Items"
 
     def __str__(self) -> str:
-        return f'{self.value} | {self.price}$'
+        return f"{self.value} | {self.price}$"
 
     @classmethod
     def items(cls, **kwargs):
         return super().items(category=cls.Category.PUBG_UC, **kwargs)
 
-    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+    def save(
+        self, force_insert=False, force_update=False, using=None, update_fields=None
+    ):
         self.category = Item.Category.PUBG_UC
         return super().save(force_insert, force_update, using, update_fields)
 
 
 class StockCodesItem(Item):
-
     class Meta:
         proxy = True
-        verbose_name = 'STOCKBLE CODES'
-        verbose_name_plural = 'STOCKBLE CODES'
+        verbose_name = "STOCKBLE CODES"
+        verbose_name_plural = "STOCKBLE CODES"
 
     @classmethod
     def items(cls, **kwargs):
-        return super().items(category=cls.Category.CODES, **kwargs).order_by('amount')
+        return super().items(category=cls.Category.CODES, **kwargs).order_by("amount")
 
-    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+    def save(
+        self, force_insert=False, force_update=False, using=None, update_fields=None
+    ):
         self.category = Item.Category.CODES
         return super().save(force_insert, force_update, using, update_fields)
 
 
 class GiftcardItem(Item):
-
-    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+    def save(
+        self, force_insert=False, force_update=False, using=None, update_fields=None
+    ):
         self.category = Item.Category.GIFTCARD
         return super().save(force_insert, force_update, using, update_fields)
 
@@ -165,7 +221,6 @@ class GiftcardItem(Item):
 
 
 class PopularityItem(Item):
-
     class Meta:
         proxy = True
         verbose_name = "Popularity"
@@ -174,15 +229,15 @@ class PopularityItem(Item):
     @classmethod
     def items(cls, **kwargs):
         return super().items(category=cls.Category.POPULARITY, **kwargs)
-        # return cls.objects.filter(category=cls.Category.POPULARITY, is_active=True)
 
-    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+    def save(
+        self, force_insert=False, force_update=False, using=None, update_fields=None
+    ):
         self.category = Item.Category.POPULARITY
         return super().save(force_insert, force_update, using, update_fields)
 
 
 class HomeVoteItem(Item):
-
     class Meta:
         proxy = True
         verbose_name = "HOME VOTE"
@@ -191,15 +246,15 @@ class HomeVoteItem(Item):
     @classmethod
     def items(cls, **kwargs):
         return super().items(category=cls.Category.HOME_VOTE, **kwargs)
-        # return cls.objects.filter(category=cls.Category.HOME_VOTE, is_active=True)
 
-    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+    def save(
+        self, force_insert=False, force_update=False, using=None, update_fields=None
+    ):
         self.category = Item.Category.HOME_VOTE
         return super().save(force_insert, force_update, using, update_fields)
 
 
 class OffersItem(Item):
-
     class Meta:
         proxy = True
         verbose_name = "Offer"
@@ -208,15 +263,15 @@ class OffersItem(Item):
     @classmethod
     def items(cls, **kwargs):
         return super().items(category=cls.Category.OFFERS, **kwargs)
-        # return cls.objects.filter(category=cls.Category.OFFERS, is_active=True)
 
-    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+    def save(
+        self, force_insert=False, force_update=False, using=None, update_fields=None
+    ):
         self.category = Item.Category.OFFERS
         return super().save(force_insert, force_update, using, update_fields)
 
 
 class StarItem(Item):
-
     class Meta:
         proxy = True
         verbose_name = "Star"
@@ -225,15 +280,15 @@ class StarItem(Item):
     @classmethod
     def items(cls, **kwargs):
         return super().items(category=cls.Category.STARS, **kwargs)
-        # return cls.objects.filter(category=cls.Category.STARS, is_active=True)
 
-    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+    def save(
+        self, force_insert=False, force_update=False, using=None, update_fields=None
+    ):
         self.category = Item.Category.STARS
         return super().save(force_insert, force_update, using, update_fields)
 
 
 class DiamondItem(Item):
-
     class Meta:
         proxy = True
         verbose_name = "MLBB Russia"
@@ -242,30 +297,24 @@ class DiamondItem(Item):
     @classmethod
     def items(cls, **kwargs):
         return super().items(category=cls.Category.DIAMOND, **kwargs)
-        # return cls.objects.filter(category=cls.Category.DIAMOND, is_active=True)
 
-    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+    def save(
+        self, force_insert=False, force_update=False, using=None, update_fields=None
+    ):
         self.category = Item.Category.DIAMOND
         return super().save(force_insert, force_update, using, update_fields)
 
 
 class Folder(models.Model):
-
     category = models.CharField(
         blank=True,
         max_length=50,
-        default=Item.Category.CODES,
         choices=Item.Category,
-        verbose_name='Category'
+        verbose_name="Category",
     )
-    title = models.CharField(
-        max_length=35,
-        verbose_name='Title'
-    )
+    title = models.CharField(max_length=35, verbose_name="Title")
     ordering_id = models.SmallIntegerField(
-        blank=True,
-        null=True,
-        verbose_name='Ordering num'
+        blank=True, null=True, verbose_name="Ordering num"
     )
 
     def aitems(self, **kwargs):
@@ -282,7 +331,33 @@ class Folder(models.Model):
     class Meta:
         verbose_name = "Folder"
         verbose_name_plural = "Folders"
-        ordering = ["ordering_id", "category", "id",]
+        ordering = [
+            "ordering_id",
+            "category",
+            "id",
+        ]
 
     def __str__(self) -> str:
-        return f'{Item.Category(self.category).label} | {self.title}'
+        return f"{Item.Category(self.category).label} | {self.title}"
+
+
+class ManualItem(Item):
+    class Meta:
+        proxy = True
+        verbose_name = "Manual Order Item"
+        verbose_name_plural = "Manual Order Items"
+
+    def save(self, *args, **kwargs):
+        self.category = Item.Category.OFFERS
+        super().save(*args, **kwargs)
+
+
+class MorePubgItem(Item):
+    class Meta:
+        proxy = True
+        verbose_name = "More PUBG Service Item"
+        verbose_name_plural = "More PUBG Service Items"
+
+    def save(self, *args, **kwargs):
+        self.category = Item.Category.POPULARITY
+        super().save(*args, **kwargs)
