@@ -321,9 +321,11 @@ async def create_order(
     codes = await order.agrab_codes()
     bot = message.bot if message else query.bot
     if codes and len(codes) == order.quantity:
-        text = generate_codes_text(codes)
+        text = generate_codes_text(codes=codes, order=order)
         if text:
-            await asend_text_or_txt(bot, chat_id=message.from_user.id, text=text)
+            await asend_text_or_txt(
+                bot, chat_id=message.from_user.id, text=text, order=order
+            )
         order.is_completed = True
         await order.asave(update_fields=("is_completed",))
     if codes and len(codes) != order.quantity:
