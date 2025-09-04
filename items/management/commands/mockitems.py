@@ -1,7 +1,8 @@
 from django.core.management import BaseCommand
+from django.core.management.base import CommandError
 
 from admin_panel.models import ManagerChat
-from items.models import PopularityItem, PUBGUCItem, StockCodesItem, Folder
+from items.models import Folder, PopularityItem, PUBGUCItem, StockCodesItem
 
 
 def mock_pubg_uc():
@@ -20,7 +21,7 @@ def mock_pubg_uc():
         8100: 82.0,
         16200: 164.0,
         24300: 246.0,
-        32400: 328.0
+        32400: 328.0,
     }
     for amount, price in uc_values.items():
         item, _ = PUBGUCItem.objects.get_or_create(
@@ -28,8 +29,7 @@ def mock_pubg_uc():
             price=price,
             amount=amount,
             is_active=True,
-            chat=ManagerChat.objects.first()
-
+            chat=ManagerChat.objects.first(),
         )
 
 
@@ -52,7 +52,7 @@ def mock_codes():
             price=10,
             category=PUBGUCItem.Category.CODES,
             is_active=True,
-            chat=ManagerChat.objects.first()
+            chat=ManagerChat.objects.first(),
         )
 
 
@@ -73,61 +73,77 @@ def mock_pops():
             price=price,
             category=PUBGUCItem.Category.POPULARITY,
             is_active=True,
-            chat=ManagerChat.objects.first()
+            chat=ManagerChat.objects.first(),
         )
     PopularityItem.objects.get_or_create(
-        title='HELICOPTER',
+        title="HELICOPTER",
         price=22.0,
         category=PUBGUCItem.Category.POPULARITY,
         is_active=True,
-        chat=ManagerChat.objects.first()
+        chat=ManagerChat.objects.first(),
     )
     PopularityItem.objects.get_or_create(
-        title='PRIVATE PLANE',
+        title="PRIVATE PLANE",
         price=68.0,
         category=PUBGUCItem.Category.POPULARITY,
         is_active=True,
-        chat=ManagerChat.objects.first()
+        chat=ManagerChat.objects.first(),
     )
 
 
 def mock_home_votes():
     values = {
-        '10k': '➖ 0.7🏢',
-        '20k': '➖ 1.4🏢',
-        '50k': '➖ 3.5🏢',
-        '100k': '➖ 6.5🏢',
-        '500k': '➖ 30🏢',
-        '1000k': '➖ 55🏢',
+        "10k": "➖ 0.7🏢",
+        "20k": "➖ 1.4🏢",
+        "50k": "➖ 3.5🏢",
+        "100k": "➖ 6.5🏢",
+        "500k": "➖ 30🏢",
+        "1000k": "➖ 55🏢",
     }
     return values
 
 
 def mock_folders():
     folder_titles = [
-        'PUBG MOBILE STOCKABLE CODES',
-        'XBOX USA',
-        'XBOX TURKEY',
-        'PLAYSTATION USA',
-        'PLAYSTATION TURKEY',
-        'STEAM USA',
-        'STEAM GLOBAL',
-        'YALLA LUDO',
-        'ITUNES USA',
-        'Roblox USA',
-        'Roblox brazil',
-        'Nintendo usa',
-        'FREE FIRE GLOBAL PINS',
-        'JAWAKER CODES',
-        'RAZER GOLD PINS',
+        "PUBG MOBILE STOCKABLE CODES",
+        "XBOX USA",
+        "XBOX TURKEY",
+        "PLAYSTATION USA",
+        "PLAYSTATION TURKEY",
+        "STEAM USA",
+        "STEAM GLOBAL",
+        "YALLA LUDO",
+        "ITUNES USA",
+        "Roblox USA",
+        "Roblox brazil",
+        "Nintendo usa",
+        "FREE FIRE GLOBAL PINS",
+        "JAWAKER CODES",
+        "RAZER GOLD PINS",
     ]
     for title in folder_titles:
-        Folder.objects.get_or_create(
-            title=title
-        )
+        Folder.objects.get_or_create(title=title)
 
 
 class Command(BaseCommand):
-
     def handle(self, *args, **options):
+        if not ManagerChat.objects.exists():
+            raise CommandError(
+                'No ManagerChat found. Please run "python manage.py mockchats" first.'
+            )
+        
+        self.stdout.write("Creating mock folders...")
         mock_folders()
+
+        self.stdout.write("Creating mock PUBG UC items...")
+        mock_pubg_uc()
+
+        self.stdout.write("Creating mock Stockable Codes items...")
+        mock_codes()
+
+        self.stdout.write("Creating mock Popularity items...")
+        mock_pops()
+
+        self.stdout.write(
+            self.style.SUCCESS("Successfully populated the database with mock items.")
+        )
