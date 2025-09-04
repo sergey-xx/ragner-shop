@@ -64,6 +64,13 @@ class TEXT_CONFIG(BaseConfig):
     WRONG_PUBGID_MSG_DESCRIPTION = "Not valid ID format"
     WRONG_PUBGID_MSG_TAGS = [ConfigTags.text]
 
+    SHOP_INFO_TEXT: str = (
+        '🕑 Working hours: 10:00 AM - 10:00 PM (GMT+3)\n'
+        'ℹ️ Please review your order details carefully before payment.'
+    )
+    SHOP_INFO_TEXT_DESCRIPTION = "Description text shown in all item selection menus."
+    SHOP_INFO_TEXT_TAGS = [ConfigTags.text]
+
 
 class BUTT_CONFIG(BaseConfig):
     __topic__ = 'Button text configuration'

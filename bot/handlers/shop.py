@@ -6,11 +6,21 @@ from django.conf import settings
 
 import bot.keyboards as kb
 from backend.config import TEXT_CONFIG
-from bot.callbacks import ItemCD, MenuCD, FolderCD
+from bot.callbacks import FolderCD, ItemCD, MenuCD
 from bot.states import OrderState
 from bot.utils import asend_text_or_txt, generate_codes_text
-from items.models import (DiamondItem, GiftcardItem, HomeVoteItem, Item, OffersItem,
-                          PopularityItem, PUBGUCItem, StockCodesItem, StarItem, Folder)
+from items.models import (
+    DiamondItem,
+    Folder,
+    GiftcardItem,
+    HomeVoteItem,
+    Item,
+    OffersItem,
+    PopularityItem,
+    PUBGUCItem,
+    StarItem,
+    StockCodesItem,
+)
 from orders.models import Order
 from orders.utils import get_user_zone_id
 from users.models import TgUser
@@ -21,77 +31,128 @@ PUBG_ID_LEN = 5
 router = Router(name=__name__)
 
 
+async def get_shop_text(base_text: str) -> str:
+    shop_description = await sync_to_async(lambda: TEXT_CONFIG.SHOP_INFO_TEXT)()
+    if shop_description:
+        return f"{shop_description}\n\n{base_text}"
+    return base_text
+
+
 @router.callback_query(MenuCD.filter(F.category == MenuCD.Category.pubg_uc))
 async def get_uc_items(query: CallbackQuery, callback_data: MenuCD, state: FSMContext):
     items = await PUBGUCItem.aitems()
-    await query.message.edit_text(text='Choose item', reply_markup=await kb.get_items_inline(items))
-
-
-@router.callback_query(MenuCD.filter(F.category == MenuCD.Category.stock_codes))
-async def get_codes_items(query: CallbackQuery, callback_data: MenuCD, state: FSMContext):
-    items = [
-        *(await StockCodesItem.aitems(folder__isnull=True)),
-        *(await GiftcardItem.aitems(folder__isnull=True))
-    ]
-    folders = [
-        *(await Folder.aget(category=Item.Category.CODES)),
-        *(await Folder.aget(category=Item.Category.GIFTCARD))
-    ]
+    text = await get_shop_text("Choose item")
     await query.message.edit_text(
-        text='Checkout your desired GiftCards from the list. All Cards are 1 Year Stockable🥰',
-        reply_markup=await kb.get_folders_inline(callback_data.category, folders, items)
+        text=text, reply_markup=await kb.get_items_inline(items)
     )
 
 
-@router.callback_query(FolderCD.filter(F.category != None))  # NOQA
-async def get_folder_items(query: CallbackQuery, callback_data: FolderCD, state: FSMContext):
+@router.callback_query(MenuCD.filter(F.category == MenuCD.Category.stock_codes))
+async def get_codes_items(
+    query: CallbackQuery, callback_data: MenuCD, state: FSMContext
+):
+    items = [
+        *(await StockCodesItem.aitems(folder__isnull=True)),
+        *(await GiftcardItem.aitems(folder__isnull=True)),
+    ]
+    folders = [
+        *(await Folder.aget(category=Item.Category.CODES)),
+        *(await Folder.aget(category=Item.Category.GIFTCARD)),
+    ]
+    base_text = "Checkout your desired GiftCards from the list. All Cards are 1 Year Stockable🥰"
+    text = await get_shop_text(base_text)
+    await query.message.edit_text(
+        text=text,
+        reply_markup=await kb.get_folders_inline(
+            callback_data.category, folders, items
+        ),
+    )
+
+
+@router.callback_query(FolderCD.filter(F.category != None))
+async def get_folder_items(
+    query: CallbackQuery, callback_data: FolderCD, state: FSMContext
+):
     folder = await Folder.objects.aget(id=callback_data.id)
     items = await folder.aitems()
+    text = await get_shop_text("Choose item")
     await query.message.edit_text(
-        text='Choose item',
-        reply_markup=await kb.get_items_inline(items, callback_data=MenuCD(category=callback_data.category)),
+        text=text,
+        reply_markup=await kb.get_items_inline(
+            items, callback_data=MenuCD(category=callback_data.category)
+        ),
     )
 
 
 @router.callback_query(MenuCD.filter(F.category == MenuCD.Category.pop_home))
-async def get_pop_home_root(query: CallbackQuery, callback_data: MenuCD, state: FSMContext):
-    await query.message.edit_text(text='Choose category', reply_markup=await kb.get_pop_home_inline())
+async def get_pop_home_root(
+    query: CallbackQuery, callback_data: MenuCD, state: FSMContext
+):
+    await query.message.edit_text(
+        text="Choose category", reply_markup=await kb.get_pop_home_inline()
+    )
 
 
 @router.callback_query(MenuCD.filter(F.category == MenuCD.Category.popularity))
-async def get_popularity_items(query: CallbackQuery, callback_data: MenuCD, state: FSMContext):
+async def get_popularity_items(
+    query: CallbackQuery, callback_data: MenuCD, state: FSMContext
+):
     items = await PopularityItem.aitems()
+    text = await get_shop_text("Choose item")
     await query.message.edit_text(
-        text='Choose item',
-        reply_markup=await kb.get_items_inline(items, callback_data=MenuCD(category=MenuCD.Category.pop_home)),
+        text=text,
+        reply_markup=await kb.get_items_inline(
+            items, callback_data=MenuCD(category=MenuCD.Category.pop_home)
+        ),
     )
 
 
 @router.callback_query(MenuCD.filter(F.category == MenuCD.Category.home_vote))
-async def get_home_vote_items(query: CallbackQuery, callback_data: MenuCD, state: FSMContext):
+async def get_home_vote_items(
+    query: CallbackQuery, callback_data: MenuCD, state: FSMContext
+):
     items = await HomeVoteItem.aitems()
+    text = await get_shop_text("Choose item")
     await query.message.edit_text(
-        text='Choose item',
-        reply_markup=await kb.get_items_inline(items, callback_data=MenuCD(category=MenuCD.Category.pop_home),),
+        text=text,
+        reply_markup=await kb.get_items_inline(
+            items,
+            callback_data=MenuCD(category=MenuCD.Category.pop_home),
+        ),
     )
 
 
 @router.callback_query(MenuCD.filter(F.category == MenuCD.Category.offers))
-async def get_offer_items(query: CallbackQuery, callback_data: MenuCD, state: FSMContext):
+async def get_offer_items(
+    query: CallbackQuery, callback_data: MenuCD, state: FSMContext
+):
     items = await OffersItem.aitems()
-    await query.message.edit_text(text='Choose item', reply_markup=await kb.get_items_inline(items))
+    text = await get_shop_text("Choose item")
+    await query.message.edit_text(
+        text=text, reply_markup=await kb.get_items_inline(items)
+    )
 
 
 @router.callback_query(MenuCD.filter(F.category == MenuCD.Category.stars))
-async def get_stars_items(query: CallbackQuery, callback_data: MenuCD, state: FSMContext):
+async def get_stars_items(
+    query: CallbackQuery, callback_data: MenuCD, state: FSMContext
+):
     items = await StarItem.aitems()
-    await query.message.edit_text(text='Choose item', reply_markup=await kb.get_items_inline(items))
+    text = await get_shop_text("Choose item")
+    await query.message.edit_text(
+        text=text, reply_markup=await kb.get_items_inline(items)
+    )
 
 
 @router.callback_query(MenuCD.filter(F.category == MenuCD.Category.diamond))
-async def get_DiamondItem_items(query: CallbackQuery, callback_data: MenuCD, state: FSMContext):
+async def get_DiamondItem_items(
+    query: CallbackQuery, callback_data: MenuCD, state: FSMContext
+):
     items = await DiamondItem.aitems()
-    await query.message.edit_text(text='Choose item', reply_markup=await kb.get_items_inline(items))
+    text = await get_shop_text("Choose item")
+    await query.message.edit_text(
+        text=text, reply_markup=await kb.get_items_inline(items)
+    )
 
 
 @router.callback_query(ItemCD.filter(F.action == ItemCD.Action.view))
@@ -100,7 +161,7 @@ async def get_item(query: CallbackQuery, callback_data: ItemCD, state: FSMContex
     item = await Item.objects.aget(id=callback_data.id)
     quantity = await item.aget_stock_amount()
     if quantity is not None and quantity < 1:
-        await query.answer('Not available at the moment')
+        await query.answer("Not available at the moment")
         return
     await state.update_data(callback_data.model_dump())
     if item.category in (
@@ -111,31 +172,31 @@ async def get_item(query: CallbackQuery, callback_data: ItemCD, state: FSMContex
     ):
         await state.set_state(OrderState.pubg_id)
         await query.message.edit_text(
-            f'"Input your PUBG id" for {item.value}',
-            reply_markup=None
+            f'"Input your PUBG id" for {item.value}', reply_markup=None
         )
     elif item.category in (Item.Category.DIAMOND,):
         await state.set_state(OrderState.user_id)
         await query.message.edit_text(
             f'Input your "User ID" and "Zone ID" for {item.value} like this: 334882026(1017)',
-            reply_markup=None
+            reply_markup=None,
         )
     elif item.category in (Item.Category.CODES, Item.Category.GIFTCARD):
         await state.set_state(OrderState.quantity)
         await query.message.edit_text(
-            text=f'Write the quantity of {item.value}',
-            reply_markup=None
+            text=f"Write the quantity of {item.value}", reply_markup=None
         )
     elif item.category in (Item.Category.STARS,):
         await state.set_state(OrderState.username)
         await query.message.edit_text(
-            text=f'Write your username or tap /{query.from_user.username} for {item.value} ',
-            reply_markup=None
+            text=f"Write your username or tap /{query.from_user.username} for {item.value} ",
+            reply_markup=None,
         )
 
 
 @router.callback_query(ItemCD.filter(F.action == ItemCD.Action.proceed))
-async def pay_item_by_keyboard(query: CallbackQuery, callback_data: ItemCD, state: FSMContext):
+async def pay_item_by_keyboard(
+    query: CallbackQuery, callback_data: ItemCD, state: FSMContext
+):
     item = await Item.objects.aget(id=callback_data.id)
     await create_order(state, item, query=query)
 
@@ -149,9 +210,9 @@ async def get_pubg_id(message: Message, state: FSMContext):
     await state.update_data(pubg_id=message.text)
     await state.set_state(None)
     data = await state.get_data()
-    id = data['id']
+    id = data["id"]
     item = await Item.objects.aget(id=id)
-    text = f'{item.value} for total {item.get_total_price(1)} USD'
+    text = f"{item.value} for total {item.get_total_price(1)} USD"
     await create_order(state, item, message=message)
     await state.set_state(None)
 
@@ -161,18 +222,18 @@ async def get_user_id(message: Message, state: FSMContext):
     text = await sync_to_async(lambda: TEXT_CONFIG.WRONG_PUBGID_MSG)()
     try:
         user_id, zone_id = get_user_zone_id(message.text)
-    except:  # NOQA
+    except:
         await message.answer(text)
         return
     if not user_id.isdigit() or not zone_id.isdigit():
         await message.answer(text)
         return
-    await state.update_data(pubg_id=f'{user_id}({zone_id})')
+    await state.update_data(pubg_id=f"{user_id}({zone_id})")
     await state.set_state(None)
     data = await state.get_data()
-    id = data['id']
+    id = data["id"]
     item = await Item.objects.aget(id=id)
-    text = f'{item.value} for total {item.get_total_price(1)} USD'
+    text = f"{item.value} for total {item.get_total_price(1)} USD"
     await create_order(state, item, message=message)
     await state.set_state(None)
 
@@ -182,17 +243,17 @@ async def get_quantity(message: Message, state: FSMContext):
     try:
         quantity = int(message.text)
     except ValueError:
-        await message.answer('Try again')
+        await message.answer("Try again")
         return
     if quantity < 1:
-        await message.answer('Min quantity is 1')
+        await message.answer("Min quantity is 1")
         return
     await state.update_data(quantity=quantity)
     data = await state.get_data()
-    id = data['id']
+    id = data["id"]
     item = await Item.objects.aget(id=id)
     if (in_stock := await item.aget_stock_amount()) < quantity:
-        await message.answer(f'Only {in_stock} {item} remains in stock')
+        await message.answer(f"Only {in_stock} {item} remains in stock")
         return
     await create_order(state, item, message=message)
     await state.set_state(None)
@@ -200,12 +261,12 @@ async def get_quantity(message: Message, state: FSMContext):
 
 @router.message(OrderState.username)
 async def get_username(message: Message, state: FSMContext):
-    if message.text.startswith('/'):
-        username = message.text.split('/')[1]
+    if message.text.startswith("/"):
+        username = message.text.split("/")[1]
     else:
         username = message.text
     data = await state.get_data()
-    id = data['id']
+    id = data["id"]
     await state.update_data(username=username)
     item = await Item.objects.aget(id=id)
     await create_order(state, item, message=message)
@@ -222,12 +283,12 @@ async def create_order(
     tg_id = message.from_user.id if message else query.from_user.id
     tg_user = await TgUser.objects.aget(tg_id=tg_id)
     data = await state.get_data()
-    quantity = data.get('quantity') or 1
-    pubg_id = data.get('pubg_id')
-    username = data.get('username')
+    quantity = data.get("quantity") or 1
+    pubg_id = data.get("pubg_id")
+    username = data.get("username")
     price = item.price * quantity
     if price > tg_user.balance:
-        text = 'You do not have enough balance'
+        text = "You do not have enough balance"
         if message:
             await message.answer(text)
         elif query:
@@ -244,25 +305,19 @@ async def create_order(
         balance_before=tg_user.balance,
     )
     await tg_user.arefresh_from_db()
-    text = f'Processing order…\n{await order.auser_str()}'
+    text = f"Processing order…\n{await order.auser_str()}"
     if message:
         new_message = await message.answer(text)
     elif query:
         await query.message.edit_text(text, reply_markup=None)
         new_message = query.message
     order.message_id = new_message.message_id
-    await order.asave(update_fields=('message_id',))
+    await order.asave(update_fields=("message_id",))
     text = await sync_to_async(lambda: TEXT_CONFIG.MENU_MSG)()
     if message:
-        await message.answer(
-            text,
-            reply_markup=await kb.get_menu_inline()
-        )
+        await message.answer(text, reply_markup=await kb.get_menu_inline())
     elif query:
-        await query.message.answer(
-            text,
-            reply_markup=await kb.get_menu_inline()
-        )
+        await query.message.answer(text, reply_markup=await kb.get_menu_inline())
     codes = await order.agrab_codes()
     bot = message.bot if message else query.bot
     if codes and len(codes) == order.quantity:
@@ -270,7 +325,7 @@ async def create_order(
         if text:
             await asend_text_or_txt(bot, chat_id=message.from_user.id, text=text)
         order.is_completed = True
-        await order.asave(update_fields=('is_completed',))
+        await order.asave(update_fields=("is_completed",))
     if codes and len(codes) != order.quantity:
         order.is_completed = False
-        await order.asave(update_fields=('is_completed',))
+        await order.asave(update_fields=("is_completed",))
