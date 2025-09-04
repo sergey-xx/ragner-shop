@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'import_export',
+    'backend.apps.BackendConfig',
     'users.apps.UsersConfig',
     'admin_panel.apps.AdminPanelConfig',
     'liveconfigs',
