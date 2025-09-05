@@ -1,0 +1,207 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    #daily-report-content .report-section {
+        background: var(--module-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        margin-top: 2rem;
+        padding: 20px;
+    }
+    #daily-report-content .report-section h2, 
+    #daily-report-content .report-section h3 {
+        color: var(--body-fg);
+        border-bottom: 1px solid var(--hairline-color, var(--border-color));
+        padding-bottom: 10px;
+        margin-top: 0;
+        margin-bottom: 1.5rem;
+    }
+    #daily-report-content .report-section h3 {
+        font-size: 1.1rem;
+        border-bottom: none;
+        margin-bottom: 1rem;
+    }
+    #daily-report-content .date-filter {
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    #daily-report-content .date-filter label {
+        font-weight: bold;
+    }
+    #daily-report-content table {
+        width: 100%;
+        margin-top: 15px;
+        border-collapse: collapse;
+    }
+    #daily-report-content th, 
+    #daily-report-content td {
+        text-align: left;
+        padding: 10px;
+        border: 1px solid var(--border-color);
+    }
+    
+    #daily-report-content th {
+        font-weight: 600;
+        color: var(--body-fg);
+    }
+    
+    #daily-report-content #report_date, 
+    #daily-report-content .date-filter button {
+        background-color: var(--body-bg);
+        color: var(--body-fg);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        padding: 8px;
+    }
+
+    #daily-report-content #report_date {
+        color-scheme: dark;
+    }
+    
+
+    #daily-report-content .date-filter button {
+        background-color: var(--button-bg);
+        color: var(--button-fg);
+        border-color: var(--button-bg);
+        cursor: pointer;
+        font-weight: bold;
+    }
+    #daily-report-content .date-filter button:hover {
+        background-color: var(--button-hover-bg);
+    }
+</style>
+{% endblock %}
+
+
+{% block content %}
+<div id="daily-report-content">
+
+    <h1>Daily Sales & Inventory Report for {{ report_date|date:"F j, Y" }}</h1>
+
+    <div class="date-filter">
+        <form action="" method="get" style="display: contents;">
+            <label for="report_date">Select Date:</label>
+            <input type="date" id="report_date" name="report_date" value="{{ report_date_str }}">
+            <button type="submit">View Report</button>
+        </form>
+    </div>
+
+
+    <div class="report-section">
+        <h2>UC Codes Summary</h2>
+        
+        <h3>Daily Activity for {{ report_date|date:"F j, Y" }}</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>UC Denomination</th>
+                    <th>Added Today</th>
+                    <th>Sold Today</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% with added=uc_added_today sold=uc_sold_today all_amounts=uc_remaining_stock %}
+                {% for item in all_amounts|dictsort:"amount" %}
+                    <tr>
+                        <td>{{ item.amount }} UC</td>
+                        <td>
+                            {% for added_item in added %}{% if added_item.amount == item.amount %}{{ added_item.count }}{% endif %}{% endfor %}
+                            {% if item.amount not in added|dictsort:"amount"|cut:" "|join:"" %}0{% endif %}
+                        </td>
+                        <td>
+                             {% for sold_item in sold %}{% if sold_item.amount == item.amount %}{{ sold_item.count }}{% endif %}{% endfor %}
+                             {% if item.amount not in sold|dictsort:"amount"|cut:" "|join:"" %}0{% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="3">No UC code activity found.</td></tr>
+                {% endfor %}
+                {% endwith %}
+            </tbody>
+        </table>
+
+        <h3>Current Stock</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>UC Denomination</th>
+                    <th>Remaining in Stock</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in uc_remaining_stock %}
+                    <tr>
+                        <td>{{ item.amount }} UC</td>
+                        <td>{{ item.count }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="2">No UC codes in stock.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="report-section">
+        <h2>Gift Cards & Other Codes Summary</h2>
+        
+        <h3>Stock Added Today ({{ report_date|date:"F j, Y" }})</h3>
+         <table>
+            <thead>
+                <tr>
+                    <th>Product Type</th>
+                    <th>Quantity Added</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in giftcards_added_today %}
+                    <tr>
+                        <td>{{ item.item__title }}</td>
+                        <td>{{ item.count }}</td>
+                    </tr>
+                {% endfor %}
+                {% for item in stockblecodes_added_today %}
+                     <tr>
+                        <td>{{ item.amount }} UC (Stockable)</td>
+                        <td>{{ item.count }}</td>
+                    </tr>
+                {% endfor %}
+                {% if not giftcards_added_today and not stockblecodes_added_today %}
+                <tr><td colspan="2">No codes or giftcards were added today.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+
+        <h3>Sales Details for {{ report_date|date:"F j, Y" }}</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Client</th>
+                    <th>Item</th>
+                    <th>Quantity</th>
+                    <th>Total Cost</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in daily_orders_details %}
+                    <tr>
+                        <td>{{ order.tg_user.username|default:"N/A" }} (ID: {{ order.tg_user.tg_id }})</td>
+                        <td>{{ order.item.value }}</td>
+                        <td>{{ order.quantity }}</td>
+                        <td>${{ order.price }}</td>
+                        <td>{{ order.created_at|date:"H:i:s" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="5">No sales of Gift Cards or other codes today.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+{% endblock %}
