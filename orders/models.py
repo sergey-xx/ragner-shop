@@ -145,16 +145,6 @@ class Order(models.Model):
         return CODES_MAP[self.item.amount]
 
     def grab_uc(self):
-        if not self.item.activator:
-            logger.info('Item does not need to be processed over API')
-            text = (f'Process order {self.title}\n'
-                    f'{self.item.amount} UC\n'
-                    f'PUBG id: {self.pubg_id}\n'
-                    'by yourself')
-            self.send_manager_notification(
-                text, keyboard=KEYBOARDS.MAKE_ORDER_COMLETED, kwargs={'id': self.id}
-            )
-            return
         codes = UcCode.objects.filter(order=self).aggregate(models.Sum('amount'))
         if codes.get('amount_sum', 0) >= self.item.amount:
             return
@@ -162,7 +152,8 @@ class Order(models.Model):
         logger.info(f'Ищем коды номиналов {nominals}')
         for nom in nominals:
             code = UcCode.objects.filter(
-                activator=self.item.activator, amount=nom, is_activated=False, order__isnull=True).first()
+                amount=nom, is_activated=False, order__isnull=True
+            ).order_by('-is_priority_use', 'created_at').first()
             if code:
                 code.order = self
                 code.save(update_fields=('order',))

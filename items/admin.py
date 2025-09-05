@@ -25,12 +25,12 @@ class PUBGUCItemAdmin(admin.ModelAdmin):
         "price",
         "amount",
         "is_active",
-        "activator",
     )
     readonly_fields = (
         "category",
         "data",
     )
+    exclude = ('activator',)
 
     def get_queryset(self, request):
         return super().get_queryset(request).filter(category=Item.Category.PUBG_UC)

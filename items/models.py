@@ -146,20 +146,21 @@ class Item(models.Model):
         if self.category == Item.Category.GIFTCARD:
             return self.giftcard_codes.filter(order__isnull=True).count()
         if self.category == Item.Category.PUBG_UC:
-            nominals = CODES_MAP[self.amount]
-            counter = [
-                int(
-                    UcCode.objects.filter(
-                        models.Q(activator=self.activator)
-                        | models.Q(activator__isnull=True),
-                        order__isnull=True,
-                        amount=nom,
-                    ).count()
-                    / nominals.count(nom)
-                )
-                for nom in nominals
-            ]
-            return min(counter)
+            nominals = CODES_MAP.get(self.amount)
+            if not nominals:
+                return 0
+            
+            counter = []
+            for nom in set(nominals):
+                available_codes = UcCode.objects.filter(
+                    order__isnull=True,
+                    amount=nom,
+                ).count()
+
+                possible_items = available_codes // nominals.count(nom)
+                counter.append(possible_items)
+            
+            return min(counter) if counter else 0
         return None
 
     async def aget_stock_amount(self):
