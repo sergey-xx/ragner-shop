@@ -1,8 +1,11 @@
+from collections import Counter
+
 from asgiref.sync import sync_to_async
 from django.db import models
+from django.db.models import Count
 
 from admin_panel.models import ManagerChat
-from backend.constants import CODES_MAP, DEFAULT_UC_AMOUNTS
+from backend.constants import CODES_MAP, DEFAULT_UC_AMOUNTS, UC_RECIPES
 from codes.models import Activator, StockbleCode, UcCode
 
 
@@ -146,21 +149,63 @@ class Item(models.Model):
         if self.category == Item.Category.GIFTCARD:
             return self.giftcard_codes.filter(order__isnull=True).count()
         if self.category == Item.Category.PUBG_UC:
-            nominals = CODES_MAP.get(self.amount)
-            if not nominals:
-                return 0
-            
-            counter = []
-            for nom in set(nominals):
-                available_codes = UcCode.objects.filter(
-                    order__isnull=True,
-                    amount=nom,
-                ).count()
+            if self.amount not in UC_RECIPES:
+                nominals = CODES_MAP.get(self.amount)
+                if not nominals:
+                    return 0
 
-                possible_items = available_codes // nominals.count(nom)
-                counter.append(possible_items)
+                counter = []
+                for nom in set(nominals):
+                    available_codes = UcCode.objects.filter(
+                        order__isnull=True,
+                        amount=nom,
+                    ).count()
+
+                    possible_items = available_codes // nominals.count(nom)
+                    counter.append(possible_items)
+
+                return min(counter) if counter else 0
+
+            recipes = UC_RECIPES.get(self.amount, [])
+            if not recipes:
+                return 0
+
+            all_possible_components = {
+                component for recipe in recipes for component in recipe
+            }
+            available_codes_counts = {
+                item["amount"]: item["count"]
+                for item in UcCode.objects.filter(
+                    order__isnull=True, amount__in=all_possible_components
+                )
+                .values("amount")
+                .annotate(count=Count("id"))
+            }
+
+            direct_recipe = [self.amount]
+            if direct_recipe in recipes:
+                direct_codes_count = available_codes_counts.get(self.amount, 0)
+                if direct_codes_count > 0:
+                    return direct_codes_count
             
-            return min(counter) if counter else 0
+            for recipe in recipes:
+                if recipe == [self.amount]:
+                    continue
+                
+                recipe_requirements = Counter(recipe)
+                possible_builds = []
+                can_build = True
+                for component, required_count in recipe_requirements.items():
+                    available_count = available_codes_counts.get(component, 0)
+                    if available_count < required_count:
+                        can_build = False
+                        break
+                    possible_builds.append(available_count // required_count)
+                
+                if can_build and possible_builds:
+                    return min(possible_builds)
+        
+            return 0
         return None
 
     async def aget_stock_amount(self):
