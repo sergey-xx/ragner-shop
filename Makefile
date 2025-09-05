@@ -14,7 +14,6 @@ DC_PROD=docker compose -f $(COMPOSE_FILE_PROD) -p $(COMPOSE_PROJECT_NAME_PROD) -
 dev-build dev-up dev-down dev-stop dev-restart dev-logs dev-shell \
 dev-makemigrations dev-migrate dev-superuser dev-static
 
-# ====================================================================================
 
 dev-build:
 	$(DC_DEV) build
@@ -63,3 +62,46 @@ dev-mock-codes:
 
 dev-panel-shell:
 	$(DC_DEV) exec admin_panel sh
+
+
+# ====================================================================================
+
+
+.PHONY: prod-build prod-up prod-down prod-stop prod-restart prod-logs prod-shell \
+		prod-migrate prod-superuser prod-static prod-load-config prod-panel-shell
+
+prod-build:
+	$(DC_PROD) build
+
+prod-up:
+	$(DC_PROD) up -d
+
+prod-down:
+	$(DC_PROD) down $(args)
+
+prod-stop:
+	$(DC_PROD) stop
+
+prod-restart:
+	$(DC_PROD) restart $(s)
+
+prod-logs:
+	$(DC_PROD) logs -f $(s)
+
+prod-shell:
+	$(DC_PROD) exec $(s) sh
+
+prod-migrate:
+	$(DC_PROD) exec admin_panel python manage.py migrate
+
+prod-superuser:
+	$(DC_PROD) exec admin_panel python manage.py createsuperuser
+
+prod-static:
+	$(DC_PROD) exec admin_panel python manage.py collectstatic --noinput
+
+prod-load-config:
+	$(DC_PROD) exec admin_panel python manage.py load_config
+
+prod-panel-shell:
+	$(DC_PROD) exec admin_panel sh

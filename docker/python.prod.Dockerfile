@@ -1,17 +1,16 @@
-FROM python:3.12
+FROM python:3.12-slim-bookworm
 
-WORKDIR /
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-RUN python -m pip install --upgrade pip
-RUN pip install "poetry==2.1.1"
+WORKDIR /app
 
 COPY poetry.lock pyproject.toml ./
 
-RUN poetry config virtualenvs.create false \
-    && poetry install --no-root
+RUN pip install "poetry==2.1.4"
 
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+RUN poetry config virtualenvs.create false \
+    && poetry install --no-root --only main
 
 COPY . .
 
