@@ -6,7 +6,6 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from asgiref.sync import sync_to_async
 
 from backend.config import BUTT_CONFIG
-from bot.callbacks import FolderCD, HistoryCD, ItemCD, MenuCD, OrderCD, ProfileCD
 from items.models import (
     DiamondItem,
     Folder,
@@ -19,6 +18,8 @@ from items.models import (
     PUBGUCItem,
     StarItem,
 )
+
+from .callbacks import ApiCD, FolderCD, HistoryCD, ItemCD, MenuCD, OrderCD, ProfileCD
 
 
 async def get_menu_inline():
@@ -61,6 +62,7 @@ async def get_menu_inline():
     markup.button(
         text="Profile", callback_data=MenuCD(category=MenuCD.Category.profile)
     )
+    markup.button(text="🔐 API", callback_data=MenuCD(category=MenuCD.Category.api))
     markup.adjust(1, 2, 2)
     return markup.as_markup()
 
@@ -87,7 +89,10 @@ async def get_more_pubg_services_inline():
         )
     new_folders = await Folder.aget(category=Item.Category.MORE_PUBG)
     for folder in new_folders:
-        markup.button(text=folder.title, callback_data=FolderCD(id=folder.id, category=Item.Category.MORE_PUBG))
+        markup.button(
+            text=folder.title,
+            callback_data=FolderCD(id=folder.id, category=Item.Category.MORE_PUBG),
+        )
     markup.button(
         text=await sync_to_async(lambda: BUTT_CONFIG.BACK)(),
         callback_data=MenuCD(category="root"),
@@ -257,4 +262,15 @@ async def get_folders_inline(category: str, folders: list[Folder], items: list[I
         callback_data=MenuCD(category="root"),
     )
     markup.adjust(1, repeat=True)
+    return markup.as_markup()
+
+
+async def get_api_management_inline():
+    markup = InlineKeyboardBuilder()
+    markup.button(text="🔁 Generate New Key", callback_data=ApiCD(action="regenerate"))
+    markup.button(
+        text=await sync_to_async(lambda: BUTT_CONFIG.BACK)(),
+        callback_data=MenuCD(category="root"),
+    )
+    markup.adjust(1)
     return markup.as_markup()

@@ -1,60 +1,55 @@
-from enum import StrEnum, IntEnum
+from enum import IntEnum, StrEnum
 
 from aiogram.filters.callback_data import CallbackData
 
 
-class MenuCD(CallbackData, prefix='men'):
-
+class MenuCD(CallbackData, prefix="men"):
     class Category(StrEnum):
-        pubg_uc = 'pubg_uc'
-        stock_codes = 'codes'
-        pop_home = 'pop_home'
-        popularity = 'popularity'
-        home_vote = 'home_vote'
-        offers = 'offers'
-        profile = 'profile'
-        stars = 'stars'
-        diamond = 'diamond'
+        pubg_uc = "pubg_uc"
+        stock_codes = "codes"
+        pop_home = "pop_home"
+        popularity = "popularity"
+        home_vote = "home_vote"
+        offers = "offers"
+        profile = "profile"
+        stars = "stars"
+        diamond = "diamond"
+        api = "api"
 
     category: str
 
 
-class ProfileCD(CallbackData, prefix='pro'):
-
+class ProfileCD(CallbackData, prefix="pro"):
     class Category(StrEnum):
-        HISOTORY = 'hisotory'
-        POINTS = 'points'
-        BALANCE = 'balance'
+        HISOTORY = "hisotory"
+        POINTS = "points"
+        BALANCE = "balance"
 
     category: Category
     action: str | None = None
 
 
-class ItemCD(CallbackData, prefix='itm'):
-
+class ItemCD(CallbackData, prefix="itm"):
     class Action(StrEnum):
-        view = 'view'
-        proceed = 'proceed'
+        view = "view"
+        proceed = "proceed"
 
     category: str
     id: int
     action: str
 
 
-class OrderCD(CallbackData, prefix='ordr'):
-
+class OrderCD(CallbackData, prefix="ordr"):
     class Action(StrEnum):
-        complete = 'complete'
-        cancel = 'cancel'
+        complete = "complete"
+        cancel = "cancel"
 
     id: int
     action: Action
 
 
-class HistoryCD(CallbackData, prefix='hstr'):
-
+class HistoryCD(CallbackData, prefix="hstr"):
     class Category(IntEnum):
-
         DAY = 1
         WEEK = 7
         MONTH = 30
@@ -63,7 +58,10 @@ class HistoryCD(CallbackData, prefix='hstr'):
     page: int = 1
 
 
-class FolderCD(CallbackData, prefix='fldr'):
-
+class FolderCD(CallbackData, prefix="fldr"):
     id: int
     category: str
+
+
+class ApiCD(CallbackData, prefix="api"):
+    action: str
