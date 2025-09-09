@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from .models import (
+    CategoryDescription,
     DiamondItem,
     Folder,
     GiftcardItem,
@@ -17,6 +18,12 @@ from .models import (
 )
 
 
+@admin.register(CategoryDescription)
+class CategoryDescriptionAdmin(admin.ModelAdmin):
+    list_display = ("category", "description")
+    search_fields = ("category",)
+
+
 @admin.register(PUBGUCItem)
 class PUBGUCItemAdmin(admin.ModelAdmin):
     list_display = (
@@ -30,7 +37,7 @@ class PUBGUCItemAdmin(admin.ModelAdmin):
         "category",
         "data",
     )
-    exclude = ('activator',)
+    exclude = ("activator",)
 
     def get_queryset(self, request):
         return super().get_queryset(request).filter(category=Item.Category.PUBG_UC)

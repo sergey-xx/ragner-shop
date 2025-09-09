@@ -10,6 +10,7 @@ from bot.callbacks import FolderCD, ItemCD, MenuCD
 from bot.states import OrderState
 from bot.utils import asend_text_or_txt, generate_codes_text
 from items.models import (
+    CategoryDescription,
     DiamondItem,
     Folder,
     GiftcardItem,
@@ -32,17 +33,37 @@ PUBG_ID_LEN = 5
 router = Router(name=__name__)
 
 
-async def get_shop_text(base_text: str) -> str:
-    shop_description = await sync_to_async(lambda: TEXT_CONFIG.SHOP_INFO_TEXT)()
+async def get_shop_text(base_text: str, category_key: str) -> str:
+    shop_description = ""
+    try:
+        if category_key.startswith("manual_"):
+            category_id = int(category_key.split("_")[1])
+            manual_cat = await ManualCategory.objects.filter(id=category_id).afirst()
+            if manual_cat and manual_cat.description:
+                shop_description = manual_cat.description
+        else:
+            desc_obj = await CategoryDescription.objects.filter(
+                category=category_key
+            ).afirst()
+            if desc_obj and desc_obj.description:
+                shop_description = desc_obj.description
+    except (ValueError, IndexError):
+        pass
+
     if shop_description:
         return f"{shop_description}\n\n{base_text}"
+
+    default_shop_info = await sync_to_async(lambda: TEXT_CONFIG.SHOP_INFO_TEXT)()
+    if default_shop_info:
+        return f"{default_shop_info}\n\n{base_text}"
+
     return base_text
 
 
 @router.callback_query(MenuCD.filter(F.category == MenuCD.Category.pubg_uc))
 async def get_uc_items(query: CallbackQuery, callback_data: MenuCD, state: FSMContext):
     items = await PUBGUCItem.aitems()
-    text = await get_shop_text("Choose item")
+    text = await get_shop_text("Choose item", category_key=callback_data.category)
     await query.message.edit_text(
         text=text, reply_markup=await kb.get_items_inline(items)
     )
@@ -61,7 +82,7 @@ async def get_codes_items(
         *(await Folder.aget(category=Item.Category.GIFTCARD)),
     ]
     base_text = "Checkout your desired GiftCards from the list. All Cards are 1 Year Stockable🥰"
-    text = await get_shop_text(base_text)
+    text = await get_shop_text(base_text, category_key=callback_data.category)
     await query.message.edit_text(
         text=text,
         reply_markup=await kb.get_folders_inline(
@@ -76,13 +97,14 @@ async def get_folder_items(
 ):
     folder = await Folder.objects.aget(id=callback_data.id)
     items = await folder.aitems()
-    text = await get_shop_text("Choose item")
 
     back_callback = MenuCD(category="root")
     if callback_data.category == Item.Category.MORE_PUBG:
         back_callback = MenuCD(category=MenuCD.Category.pop_home)
     elif callback_data.category in [Item.Category.CODES, Item.Category.GIFTCARD]:
         back_callback = MenuCD(category=MenuCD.Category.stock_codes)
+    
+    text = await get_shop_text("Choose item", category_key=back_callback.category)
 
     await query.message.edit_text(
         text=text,
@@ -104,7 +126,7 @@ async def get_popularity_items(
     query: CallbackQuery, callback_data: MenuCD, state: FSMContext
 ):
     items = await PopularityItem.aitems(folder__isnull=True)
-    text = await get_shop_text("Choose item")
+    text = await get_shop_text("Choose item", category_key=callback_data.category)
     await query.message.edit_text(
         text=text,
         reply_markup=await kb.get_items_inline(
@@ -118,7 +140,7 @@ async def get_home_vote_items(
     query: CallbackQuery, callback_data: MenuCD, state: FSMContext
 ):
     items = await HomeVoteItem.aitems(folder__isnull=True)
-    text = await get_shop_text("Choose item")
+    text = await get_shop_text("Choose item", category_key=callback_data.category)
     await query.message.edit_text(
         text=text,
         reply_markup=await kb.get_items_inline(
@@ -133,7 +155,7 @@ async def get_offer_items(
     query: CallbackQuery, callback_data: MenuCD, state: FSMContext
 ):
     items = await OffersItem.aitems()
-    text = await get_shop_text("Choose item")
+    text = await get_shop_text("Choose item", category_key=callback_data.category)
     await query.message.edit_text(
         text=text, reply_markup=await kb.get_items_inline(items)
     )
@@ -147,7 +169,7 @@ async def get_manual_category_items(
     items = await sync_to_async(list)(
         Item.objects.filter(manual_category_id=category_id, is_active=True)
     )
-    text = await get_shop_text("Choose item")
+    text = await get_shop_text("Choose item", category_key=callback_data.category)
     await query.message.edit_text(
         text=text, reply_markup=await kb.get_items_inline(items)
     )
@@ -158,7 +180,7 @@ async def get_stars_items(
     query: CallbackQuery, callback_data: MenuCD, state: FSMContext
 ):
     items = await StarItem.aitems()
-    text = await get_shop_text("Choose item")
+    text = await get_shop_text("Choose item", category_key=callback_data.category)
     await query.message.edit_text(
         text=text, reply_markup=await kb.get_items_inline(items)
     )
@@ -169,7 +191,7 @@ async def get_DiamondItem_items(
     query: CallbackQuery, callback_data: MenuCD, state: FSMContext
 ):
     items = await DiamondItem.aitems()
-    text = await get_shop_text("Choose item")
+    text = await get_shop_text("Choose item", category_key=callback_data.category)
     await query.message.edit_text(
         text=text, reply_markup=await kb.get_items_inline(items)
     )
@@ -233,8 +255,8 @@ async def pay_item_by_keyboard(
 @router.message(OrderState.pubg_id)
 async def get_pubg_id(message: Message, state: FSMContext):
     data = await state.get_data()
-    item_id  = data["id"]
-    item = await Item.objects.select_related('manual_category').aget(id=item_id)
+    item_id = data["id"]
+    item = await Item.objects.select_related("manual_category").aget(id=item_id)
 
     if not item.manual_category and item.category in (
         Item.Category.PUBG_UC,

@@ -16,6 +16,11 @@ class ManualCategory(models.Model):
         verbose_name="Player ID Prompt",
         help_text='e.g., "Input your PUBG ID" or "Enter your Riot ID (Name#Tag)"',
     )
+    description = models.TextField(
+        blank=True,
+        verbose_name="Description",
+        help_text="This text will be shown at the top of this category menu.",
+    )
     is_active = models.BooleanField(default=True, verbose_name="Is Active?")
     ordering = models.PositiveSmallIntegerField(default=100, verbose_name="Ordering")
 
@@ -187,11 +192,11 @@ class Item(models.Model):
                 direct_codes_count = available_codes_counts.get(self.amount, 0)
                 if direct_codes_count > 0:
                     return direct_codes_count
-            
+
             for recipe in recipes:
                 if recipe == [self.amount]:
                     continue
-                
+
                 recipe_requirements = Counter(recipe)
                 possible_builds = []
                 can_build = True
@@ -201,15 +206,36 @@ class Item(models.Model):
                         can_build = False
                         break
                     possible_builds.append(available_count // required_count)
-                
+
                 if can_build and possible_builds:
                     return min(possible_builds)
-        
+
             return 0
         return None
 
     async def aget_stock_amount(self):
         return await sync_to_async(self.get_stock_amount)()
+
+
+class CategoryDescription(models.Model):
+    category = models.CharField(
+        max_length=50,
+        choices=Item.Category.choices,
+        unique=True,
+        verbose_name="Category",
+    )
+    description = models.TextField(
+        blank=True,
+        verbose_name="Description",
+        help_text="This text will be shown at the top of the selected category menu.",
+    )
+
+    class Meta:
+        verbose_name = "Category Description"
+        verbose_name_plural = "Category Descriptions"
+
+    def __str__(self):
+        return self.get_category_display()
 
 
 class PUBGUCItem(Item):
@@ -308,7 +334,9 @@ class OffersItem(Item):
 
     @classmethod
     def items(cls, **kwargs):
-        return super().items(category=cls.Category.OFFERS, **kwargs)
+        return super().items(
+            category=cls.Category.OFFERS, manual_category__isnull=True, **kwargs
+        )
 
     def save(
         self, force_insert=False, force_update=False, using=None, update_fields=None
