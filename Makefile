@@ -19,7 +19,7 @@ dev-build:
 	$(DC_DEV) build
 
 dev-up:
-	$(DC_DEV) up -d
+	$(DC_DEV) up -d $(s)
 
 dev-down:
 	$(DC_DEV) down $(args)
@@ -74,7 +74,7 @@ prod-build:
 	$(DC_PROD) build
 
 prod-up:
-	$(DC_PROD) up -d
+	$(DC_PROD) up -d $(s)
 
 prod-down:
 	$(DC_PROD) down $(args)
