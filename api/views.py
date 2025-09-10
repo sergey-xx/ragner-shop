@@ -1,3 +1,5 @@
+import logging
+
 from asgiref.sync import async_to_sync, sync_to_async
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
@@ -8,6 +10,12 @@ from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from items.models import Item, PUBGUCItem
 from orders.models import Order, TopUp
+from orders.services import (
+    InsufficientBalanceError,
+    ItemNotActiveError,
+    OutOfStockError,
+    create_order_service,
+)
 
 from .permissions import HasPositiveBalance
 from .serializers import (
@@ -64,48 +72,40 @@ class OrderViewSet(
 
     async def a_create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        await sync_to_async(serializer.is_valid)(raise_exception=True)
+
         data = serializer.validated_data
 
-        item = await sync_to_async(get_object_or_404)(Item, id=data["item_id"])
-        tg_user = request.user
-        quantity = data["quantity"]
-        price = item.price * quantity
-
-        if price > tg_user.balance:
+        item_id = data.pop("item_id")
+        item = await sync_to_async(get_object_or_404)(Item, id=item_id)
+        try:
+            order = await create_order_service(tg_user=request.user, item=item, **data)
             return Response(
-                {"success": False, "error": "Insufficient balance"},
-                status=status.HTTP_400_BAD_REQUEST,
+                {
+                    "success": True,
+                    "order_id": order.id,
+                    "message": "Order created successfully and is being processed.",
+                },
+                status=status.HTTP_201_CREATED,
             )
-
-        stock = await item.aget_stock_amount()
-        if stock is not None and stock < quantity:
+        except ItemNotActiveError as e:
             return Response(
-                {"success": False, "error": f"Not enough stock. Available: {stock}"},
-                status=status.HTTP_400_BAD_REQUEST,
+                {"success": False, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST
             )
-
-        order = await Order.objects.acreate(
-            tg_user=tg_user,
-            item=item,
-            quantity=quantity,
-            data=item.to_dict(),
-            price=price,
-            category=item.category,
-            pubg_id=data.get("pubg_id"),
-            balance_before=tg_user.balance,
-        )
-
-        await order.agrab_codes()
-
-        return Response(
-            {
-                "success": True,
-                "order_id": order.id,
-                "message": "Order created successfully.",
-            },
-            status=status.HTTP_201_CREATED,
-        )
+        except InsufficientBalanceError as e:
+            return Response(
+                {"success": False, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST
+            )
+        except OutOfStockError as e:
+            return Response(
+                {"success": False, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logging.error(f"Unexpected error during API order creation: {e}")
+            return Response(
+                {"success": False, "error": "An internal error occurred."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 
 @extend_schema(

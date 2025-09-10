@@ -24,6 +24,7 @@ urlpatterns = [
     path("import/giftcards/", import_giftcards_view, name="import_giftcards"),
     path("import/stockblecode/", import_stockblecode_view, name="import_stockblecode"),
     path("webhook/fars/", webhook_fars, name="webhook_fars"),
+    path("", include(api_v1_patterns)),
     path(
         "api/v1/schema/",
         SpectacularAPIView.as_view(patterns=api_v1_patterns),

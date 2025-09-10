@@ -45,8 +45,92 @@ class OrderSerializer(serializers.ModelSerializer):
 
 class CreateOrderSerializer(serializers.Serializer):
     item_id = serializers.IntegerField()
-    quantity = serializers.IntegerField(min_value=1)
-    pubg_id = serializers.CharField(max_length=50, required=False, allow_null=True)
+    quantity = serializers.IntegerField(min_value=1, required=False, default=1)
+
+    pubg_id = serializers.CharField(
+        max_length=50,
+        required=False,
+        help_text="Required for PUBG UC, Popularity, Manual Orders, etc.",
+    )
+    username = serializers.CharField(
+        max_length=50, required=False, help_text="Required for Telegram Stars."
+    )
+    user_id_zone_id = serializers.CharField(
+        max_length=50,
+        required=False,
+        help_text="Required for Mobile Legends Diamonds (e.g., '123456(7890)').",
+    )
+
+    def validate(self, data):
+        try:
+            item = Item.objects.select_related("manual_category").get(
+                id=data["item_id"]
+            )
+        except Item.DoesNotExist:
+            raise serializers.ValidationError(
+                {"item_id": "Item with this ID does not exist."}
+            )
+
+        if not item.is_active:
+            raise serializers.ValidationError(
+                {"item_id": "This item is currently not available for purchase."}
+            )
+
+        category = item.category
+
+        is_stockable = category in (Item.Category.CODES, Item.Category.GIFTCARD)
+        quantity = data.get("quantity", 1)
+
+        if is_stockable:
+            if quantity < 1:
+                raise serializers.ValidationError(
+                    {"quantity": "A quantity of at least 1 is required."}
+                )
+        else:
+            if "quantity" in data and data["quantity"] != 1:
+                raise serializers.ValidationError(
+                    {"quantity": "This item can only be purchased in a quantity of 1."}
+                )
+            data["quantity"] = 1
+
+        manual_category = item.manual_category
+
+        if manual_category:
+            if not data.get("pubg_id"):
+                raise serializers.ValidationError(
+                    {
+                        "pubg_id": f"This field is required for '{item.title}'. Prompt: '{manual_category.prompt_text}'"
+                    }
+                )
+
+        elif category in (
+            Item.Category.PUBG_UC,
+            Item.Category.POPULARITY,
+            Item.Category.HOME_VOTE,
+            Item.Category.OFFERS,
+        ):
+            if not data.get("pubg_id"):
+                raise serializers.ValidationError(
+                    {"pubg_id": "This field is required for this item type."}
+                )
+
+        elif category == Item.Category.DIAMOND:
+            if not data.get("user_id_zone_id"):
+                raise serializers.ValidationError(
+                    {
+                        "user_id_zone_id": "This field is required (format: 'USERID(ZONEID)')."
+                    }
+                )
+            data["pubg_id"] = data.pop("user_id_zone_id")
+
+        elif category == Item.Category.STARS:
+            if not data.get("username"):
+                raise serializers.ValidationError(
+                    {"username": "This field is required for Telegram Stars."}
+                )
+            data["pubg_id"] = data.pop("username")
+
+        return data
 
 
 class PaymentSerializer(serializers.ModelSerializer):

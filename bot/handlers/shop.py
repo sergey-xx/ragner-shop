@@ -339,12 +339,11 @@ async def create_order(
     message: Message | None = None,
     query: CallbackQuery | None = None,
 ):
-    tg_id = message.from_user.id if message else query.from_user.id
-    tg_user = await TgUser.objects.aget(tg_id=tg_id)
+    tg_user = await TgUser.objects.aget(tg_id=(message or query).from_user.id)
     data = await state.get_data()
-    quantity = data.get("quantity") or 1
-    pubg_id = data.get("pubg_id")
-    username = data.get("username")
+    quantity = data.get("quantity", 1)
+    pubg_id = data.get("pubg_id") or data.get("username")
+
     price = item.price * quantity
     if price > tg_user.balance:
         text = "You do not have enough balance"
@@ -360,7 +359,7 @@ async def create_order(
         data=item.to_dict(),
         price=price,
         category=item.category,
-        pubg_id=pubg_id or username,
+        pubg_id=pubg_id,
         balance_before=tg_user.balance,
     )
     await tg_user.arefresh_from_db()
