@@ -10,7 +10,7 @@ from django.core.paginator import Paginator
 from django.utils import timezone
 
 import bot.keyboards as kb
-from backend.config import PAYMENT_CONFIG
+from backend.config import FEATURES_CONFIG, PAYMENT_CONFIG
 from bot.callbacks import ApiCD, HistoryCD, MenuCD, ProfileCD
 from bot.states import TopUpState
 from orders.models import Order, TopUp
@@ -72,6 +72,9 @@ async def get_history_slice(
     ProfileCD.filter((F.category == ProfileCD.Category.POINTS) & (F.action == None))
 )  # NOQA
 async def get_points(query: CallbackQuery, callback_data: MenuCD, state: FSMContext):
+    if not await sync_to_async(lambda: FEATURES_CONFIG.POINTS_SYSTEM_ENABLED, thread_sensitive=True)():
+        await query.answer("The points system is currently disabled.", show_alert=True)
+        return
     tg_user = await TgUser.objects.aget(tg_id=query.from_user.id)
     show_redeem = tg_user.points > tg_user.POINTS_RATIO
     await query.message.edit_text(
@@ -129,6 +132,9 @@ async def gen_topup(message: Message, state: FSMContext):
     ProfileCD.filter((F.category == ProfileCD.Category.POINTS) & (F.action))
 )
 async def redeem_points(query: CallbackQuery, callback_data: MenuCD, state: FSMContext):
+    if not await sync_to_async(lambda: FEATURES_CONFIG.POINTS_SYSTEM_ENABLED, thread_sensitive=True)():
+        await query.answer("The points system is currently disabled.", show_alert=True)
+        return
     tg_user = await TgUser.objects.aget(tg_id=query.from_user.id)
     res = await tg_user.aredeem_points()
     if res:

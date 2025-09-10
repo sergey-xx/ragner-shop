@@ -5,7 +5,7 @@ from enum import StrEnum
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from asgiref.sync import sync_to_async
 
-from backend.config import BUTT_CONFIG
+from backend.config import BUTT_CONFIG, FEATURES_CONFIG
 from items.models import (
     DiamondItem,
     Folder,
@@ -125,9 +125,10 @@ async def get_profile_inline():
     markup.button(
         text="HISTORY", callback_data=ProfileCD(category=ProfileCD.Category.HISOTORY)
     )
-    markup.button(
-        text="POINTS", callback_data=ProfileCD(category=ProfileCD.Category.POINTS)
-    )
+    if await sync_to_async(lambda: FEATURES_CONFIG.POINTS_SYSTEM_ENABLED, thread_sensitive=True)():
+        markup.button(
+            text="POINTS", callback_data=ProfileCD(category=ProfileCD.Category.POINTS)
+        )
     markup.button(
         text="BALANCE", callback_data=ProfileCD(category=ProfileCD.Category.BALANCE)
     )

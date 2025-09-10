@@ -99,12 +99,15 @@ async def get_folder_items(
     items = await folder.aitems()
 
     back_callback = MenuCD(category="root")
+    description_key = callback_data.category
     if callback_data.category == Item.Category.MORE_PUBG:
         back_callback = MenuCD(category=MenuCD.Category.pop_home)
+        description_key = Item.Category.MORE_PUBG
     elif callback_data.category in [Item.Category.CODES, Item.Category.GIFTCARD]:
         back_callback = MenuCD(category=MenuCD.Category.stock_codes)
-    
-    text = await get_shop_text("Choose item", category_key=back_callback.category)
+        description_key = MenuCD.Category.stock_codes
+
+    text = await get_shop_text("Choose item", category_key=description_key)
 
     await query.message.edit_text(
         text=text,

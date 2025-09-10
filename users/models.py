@@ -3,6 +3,8 @@ from decimal import Decimal
 from asgiref.sync import sync_to_async
 from django.db import models, transaction
 
+from backend.config import FEATURES_CONFIG
+
 
 class TgUser(models.Model):
     """Класс Пользователей ТГ."""
@@ -43,6 +45,8 @@ class TgUser(models.Model):
         return f"{self.first_name} {self.last_name}/{self.id}"
 
     def redeem_points(self):
+        if not FEATURES_CONFIG.POINTS_SYSTEM_ENABLED:
+            return False
         if self.points < self.POINTS_RATIO:
             return False
         with transaction.atomic():
@@ -65,9 +69,10 @@ class TgUser(models.Model):
                 raise ValueError("Balance cant be less than zero")
             tg_user.save()
             if amount < 0:
-                new_points = -amount
-                tg_user.points += new_points
-                tg_user.save(update_fields=("points",))
+                if FEATURES_CONFIG.POINTS_SYSTEM_ENABLED:
+                    new_points = -amount
+                    tg_user.points += new_points
+                    tg_user.save(update_fields=("points",))
 
     async def aprocess_payment(self, amount: Decimal | int | float):
         return await sync_to_async(self.process_payment)(amount)
